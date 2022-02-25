@@ -29,8 +29,8 @@ bool UdpTransport::begin()
     udp->onPacket([this](AsyncUDPPacket packet)
                   {
                     uint8_t header = packet.data()[0];
-                    Serial.printf("Recived packet remoteIP %s, localIP %s, len %d, header = 0x%x\n", packet.remoteIP().toString().c_str(),
-                                  packet.localIP().toString().c_str(), packet.length(), header);
+                    // Serial.printf("Recived packet remoteIP %s, localIP %s, len %d, header = 0x%x\n", packet.remoteIP().toString().c_str(),
+                    //              packet.localIP().toString().c_str(), packet.length(), header);
 
                     // our packets contain unsigned 8 bit PCM samples
                     // so we can push them straight into the output buffer

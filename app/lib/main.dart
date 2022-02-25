@@ -93,7 +93,7 @@ class _HomePageState extends State<HomePage> {
       _target = target;
     });
     // can't record when someone is talking, or when not enough time has passed.
-    if (_listenTo > ID_FREE || (DateTime.now().millisecondsSinceEpoch - _lastTimestamp) < (_minDt * 1000)) {
+    if (_listenTo > ID_FREE || (DateTime.now().millisecondsSinceEpoch - _lastTimestamp) < (_minDt * 200)) {
       const snackBar = SnackBar(content: Text("You can't record while someone else is speaking ..."));
       print(_listenTo);
       ScaffoldMessenger.of(context).showSnackBar(snackBar);
@@ -110,7 +110,7 @@ class _HomePageState extends State<HomePage> {
   bool _shouldListen(int sender, int target) {
     var ts = DateTime.now().millisecondsSinceEpoch;
     //print('$sender $target');
-    if (sender != ID_APP && (target == ID_APP || target == ID_BROADCAST) && (sender == _listenTo || (ts - _lastTimestamp) >= (_minDt * 1000))) {
+    if (sender != ID_APP && (target == ID_APP || target == ID_BROADCAST) && (sender == _listenTo || (ts - _lastTimestamp) >= (_minDt * 200))) {
       bool changeState = sender != _listenTo;
       _listenTo = sender;
       _lastTimestamp = ts;
@@ -125,7 +125,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _updateLineIsFree() async {
       var ts = DateTime.now().millisecondsSinceEpoch;
-      if (!recording && _listenTo != ID_FREE && (ts - _lastTimestamp) >= (_minDt * 1000)) {
+      if (!recording && _listenTo != ID_FREE && (ts - _lastTimestamp) >= (_minDt * 200)) {
         setState(() {
         _listenTo = ID_FREE;
         print('Line is Free');
@@ -221,13 +221,14 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Uint8List dataTo16Bit(Uint8List data){
+  Uint8List dataTo16Bit(Uint8List data) {
     var num_samples = (data.lengthInBytes - 1);
     var local_buff = Uint8List(num_samples * 2);
     var sample_16bit;
 
     for (var i = 0; i < num_samples; i++) {
-      sample_16bit = (data[i] ^ 0x80) >> 5;
+      sample_16bit = (data[i+1] ^ 0x80);
+      sample_16bit = (sample_16bit << 6) & 0xffff;
       local_buff[2*i] = sample_16bit & 0xff;
       local_buff[2*i + 1] = (sample_16bit & 0xff00) >> 8;
     }
@@ -525,7 +526,7 @@ class _ColorConfigPageState extends State<ColorConfigPage> {
       data: lightTheme ? ThemeData.light() : ThemeData.dark(),
       child: Builder(builder: (context) {
         return DefaultTabController(
-          length: 3,
+          length: 2,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Config Colors'),
@@ -536,7 +537,7 @@ class _ColorConfigPageState extends State<ColorConfigPage> {
                 tabs: const <Widget>[
                   Tab(text: 'Orange ESP'),
                   Tab(text: 'White ESP'),
-                  Tab(text: 'All'),
+                  // Tab(text: 'All'),
                 ],
               ),
             ),
@@ -562,7 +563,7 @@ class _ColorConfigPageState extends State<ColorConfigPage> {
                   onColorsChanged: changeColors,
                   colorHistory: colorHistory,
                 ),
-                BlockColorPickerFlutter(
+                /*BlockColorPickerFlutter(
                   deviceId: ID_BROADCAST,
                   thisESPColor: Color.fromRGBO(255, 0, 0, 1),
                   otherESPColor: Color.fromRGBO(0, 255, 0, 1),
@@ -571,7 +572,7 @@ class _ColorConfigPageState extends State<ColorConfigPage> {
                   pickerColors: currentColors,
                   onColorsChanged: changeColors,
                   colorHistory: colorHistory,
-                ),
+                ),*/
               ],
             ),
           ),
@@ -590,6 +591,7 @@ class WiFiConfigPage extends StatefulWidget {
 
 class _WiFiConfigPageState extends State<WiFiConfigPage> {
   bool lightTheme = true;
+  bool _inProgress = false;
   Color currentColor = Colors.blueGrey;
   String _ssid = 'dummy_ssid';
   String _password = 'dummy_password';
@@ -598,27 +600,28 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
   var flutterBlue = FlutterBlue.instance;
   final Set<BluetoothDevice> _devicesSet = <BluetoothDevice>{};
 
-  void sendWiFiCredentials_1() { _deviceId = 0; sendWiFiCredentials(); }
-  void sendWiFiCredentials_2() { _deviceId = 1; sendWiFiCredentials(); }
+  void sendWiFiCredentials_0() {
+    _deviceId = 0;
+    sendWiFiCredentials();
+  }
+  void sendWiFiCredentials_1() {
+    _deviceId = 1;
+    sendWiFiCredentials();
+  }
 
-  @override
-  void initState() {
-    super.initState();
-    flutterBlue.connectedDevices.asStream().listen((List<BluetoothDevice> devices) {
-      for (BluetoothDevice device in devices) {
-        print('added ${device.name}, id = ${device.id} _devicesSet.length = ${_devicesSet.length}');
-        _devicesSet.add(device);
-      }
-    });
-
+  void scanDevices() async {
+    await flutterBlue.stopScan();
     // print the devices that are discovered
     flutterBlue.scanResults.listen((List<ScanResult> results) {
       for (ScanResult result in results) {
-        print('added ${result.device.name}, id = ${result.device.id} _devicesSet.length = ${_devicesSet.length}');
-        _devicesSet.add(result.device);
+        if (!_devicesSet.contains(result.device)) {
+          // print('added ${result.device.name}, id = ${result.device.id} _devicesSet.length = ${_devicesSet.length}');
+          _devicesSet.add(result.device);
+        }
       }
     });
-    flutterBlue.startScan(timeout: Duration(seconds: 4));
+    await flutterBlue.startScan(timeout: Duration(seconds: 4));
+    await flutterBlue.stopScan();
   }
 
   @override
@@ -627,10 +630,19 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
     super.dispose();
   }
 
-  void sendWiFiCredentials() async { // todo: verify this
-    setState(() {_helpString = 'Sending WiFi credentials to ESP$_deviceId';});
+  Future<void> sendWiFiCredentials() async { // todo: verify this
+    if (!_inProgress) {
+      _inProgress = true;
+    } else {
+      return;
+    }
+
+    bool sent = false;
+    setState(() {_helpString = 'Sending WiFi credentials to ${_deviceId == 0 ? 'Orange' : 'White'} ESP';});
     // wait for the scan to finish
-    await flutterBlue.stopScan();
+    _devicesSet.clear();
+    scanDevices();
+    await Future.delayed(Duration(seconds: 3), () {});
 
     _devicesSet.forEach((device) async {
       if (device.name == getESPName(_deviceId)) {
@@ -639,20 +651,22 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
           await device.connect();
           var services = await device.discoverServices();
           services.forEach((service) {
-            print('\tdevice ${device.id} ${device.name} - service ${service.uuid}');
+            // print('\tdevice ${device.id} ${device.name} - service ${service.uuid}');
             // use this link as guide https://randomnerdtutorials.com/esp32-ble-server-client/
             if (service.uuid == Guid(ESP32_BLE_SERVICE)) {
-              var sent = 0;
               service.characteristics.forEach((char) async {
-                print('\t\tservice ${service.uuid} - char ${char.uuid} write = ${char.properties.write} read = ${char.properties.read}');
+                // print('\t\tservice ${service.uuid} - char ${char.uuid} write = ${char.properties.write} read = ${char.properties.read}');
                 if (char.uuid == Guid(SSID_CHARACTERISTIC) && char.properties.write) {
                   var text = _ssid + ' ' + _password + ' ';
-                  await char.write(utf8.encode(text));
-                  sent++;
+                  print('writing to device ${device.name} BLE "$text"');
+                  // don't await here on purpose
+                  char.write(utf8.encode(text));
+                  sent = true;
                 }
-                if (sent == 2) {
-                  setState(() {_helpString = 'Sent WiFi credentials to ESP$_deviceId';});
-                  await device.disconnect();
+                if (sent) {
+                  print('sent credentials');
+                  setState(() {_helpString = 'Sent WiFi credentials to ${_deviceId == 0 ? 'Orange' : 'White'} ESP';});
+                  _inProgress = false;
                   return;
                 }
               });
@@ -665,7 +679,12 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
         }
       }
     });
-    setState(() {_helpString = 'Failed sending WiFi credentials to ESP$_deviceId';});
+    await Future.delayed(Duration(seconds: 10), () {});
+    if (!sent) {
+      print('falied');
+      setState(() {_helpString = 'Failed sending WiFi credentials to ${_deviceId == 0 ? 'Orange' : 'White'} ESP';});
+      _inProgress = false;
+    }
   }
 
   @override
@@ -710,18 +729,18 @@ class _WiFiConfigPageState extends State<WiFiConfigPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: <Widget>[
                     FloatingActionButton(
-                      onPressed: sendWiFiCredentials_1,
+                      onPressed: sendWiFiCredentials_0,
                       tooltip: 'Orange Intercom',
                       backgroundColor: Colors.orangeAccent,
                       child: Icon(Icons.send),
-                      heroTag: 'esp1',
+                      heroTag: 'esp0',
                     ),
                     FloatingActionButton(
-                      onPressed: sendWiFiCredentials_2,
+                      onPressed: sendWiFiCredentials_1,
                       tooltip: 'White Intercom',
                       backgroundColor: Colors.grey,
                       child: Icon(Icons.send),
-                      heroTag: 'esp2',
+                      heroTag: 'esp1',
                     ),
                   ],
                 ),

@@ -52,15 +52,15 @@ void Application::get_wifi_credentials_from_bluetooth() {
     this->start_ble_server();
   while(!(this->m_ble_server->stop_waiting())) {
     turn_led_off();
-    delay(50);
+    delay(250);
     turn_led_on(COLOR_ID_BLUETOOTH);
-    delay(50);
+    delay(250);
   }
   Serial.printf("new WiFi credentials: ssid: %s, password: %s\n", this->m_wifi_ssid.c_str(), this->m_wifi_pswd.c_str());
   this->m_ble_server->stop();
 }
 
-#define MAX_RETRY 1
+#define MAX_RETRY 2
 void Application::connect_to_wifi() {
   int bluetooth_tries = 0;
 start:
@@ -132,7 +132,7 @@ void Application::begin()
 bool Application::keep_playing()
 {
   unsigned long now = millis();
-  return (now - m_last_sender_packet_time) < 1000;
+  return (now - m_last_sender_packet_time) < 200;
 }
 
 bool Application::is_for_me(const uint8_t header) {
@@ -188,7 +188,7 @@ void Application::loop()
       m_output->stop();
       // start the input to get samples from the microphone
       m_input->start();
-      // transmit for at least 1 second or while the button is pushed
+      // transmit for at least 200 mili-seconds or while the button is pushed
       unsigned long start_time = millis();
       while (millis() - start_time < 200 || !digitalRead(target_to_pin(target))) {
         // read samples from the microphone
@@ -206,7 +206,7 @@ void Application::loop()
       m_input->stop();
       m_output->start(SAMPLE_RATE);
     }
-    // while the transmit button is not pushed and 1 second has not elapsed
+    // while the transmit button is not pushed and 200 mili-seconds has not elapsed
     // Serial.print("Started Receiving ");
     digitalWrite(I2S_SPEAKER_SD_PIN, HIGH);
     while (keep_playing() && ((digitalRead(GPIO_TRANSMIT_BUTTON_BROADCAST) || 

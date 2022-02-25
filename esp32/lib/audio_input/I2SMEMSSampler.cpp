@@ -1,5 +1,6 @@
 #include "I2SMEMSSampler.h"
 #include "soc/i2s_reg.h"
+#include <cstring>
 
 I2SMEMSSampler::I2SMEMSSampler(
     i2s_port_t i2s_port,
@@ -43,7 +44,13 @@ int I2SMEMSSampler::read(int16_t *samples, int count)
     int samples_read = bytes_read / sizeof(int32_t);
     for (int i = 0; i < samples_read; i++)
     {
-        samples[i] = m_raw_samples[i] >> 11;
+        uint8_t *buffer32 = (uint8_t *)m_raw_samples;
+        uint8_t mid = buffer32[i*4 + 2];
+        uint8_t msb = buffer32[i*4 + 3];
+        uint16_t raw = (((uint32_t)msb) << 8) + ((uint32_t)mid);
+        raw = raw << 2;
+        memcpy(&(samples[i]), &raw, sizeof(raw)); // Copy so sign bits aren't interfered with somehow.
+        // samples[i] = m_raw_samples[i] >> 11;
     }
     return samples_read;
 }

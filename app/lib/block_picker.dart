@@ -9,24 +9,24 @@ import 'constants.dart';
 import 'headers.dart';
 
 const List<Color> colors = [
-  Color.fromRGBO(255, 0, 0, 1), //red
-  Colors.pink,
-  Color.fromRGBO(255, 0, 255, 1), //purple
+  Color.fromRGBO(200, 0, 0, 1), //red
+  // Colors.pink,
+  Color.fromRGBO(200, 0, 200, 1), //purple
   //Colors.deepPurple,
   //Colors.indigo,
-  Color.fromRGBO(0, 0, 255, 1), //blue
+  Color.fromRGBO(0, 0, 200, 1), //blue
   //Colors.lightBlue,
   //Colors.cyan,
-  Colors.teal,
-  Color.fromRGBO(0, 255, 0, 1), //green
+  //Colors.teal,
+  Color.fromRGBO(0, 200, 0, 1), //green
   //Colors.lightGreen,
   //Colors.lime,
-  Colors.yellow,
+  //Colors.yellow,
   //Colors.amber,
-  Colors.orange,
+  //Colors.orange,
   //Colors.deepOrange,
   //Colors.brown,
-  Color.fromRGBO(255, 255, 255, 1), //white
+  //Color.fromRGBO(255, 255, 255, 1), //white
   //Colors.blueGrey,
   Colors.black,
 ];
@@ -111,44 +111,10 @@ class _BlockColorPickerFlutterState extends State<BlockColorPickerFlutter> {
     writeConfig(widget.deviceId, widget.thisESPColor, widget.otherESPColor, widget.appColor);
   }
 
-
-  Future<String> get _localPath async {
-    final directory = await getApplicationDocumentsDirectory();
-
-    return directory.path;
-  }
-
-  Future<File> _localFile(int id) async {
-    final path = await _localPath;
-    return File('$path/config$id.config');
-  }
-
   Future<bool> isConfigFileExist(int id) async {
     final path = await _localPath;
     var configFilePath ='$path/config$id.config';
     return File(configFilePath).exists();
-  }
-
-
-  Future<List<Color>> readConfig(int id) async {
-    print('READ $id');
-    final file = await _localFile(id);
-    try {
-
-      // Read the file
-      final contents = file.readAsStringSync();
-      var colors_values = json.decode(contents);
-      widget.thisESPColor = Color(colors_values[0]);
-      widget.otherESPColor = Color(colors_values[1]);
-      widget.appColor = Color(colors_values[2]);
-
-      return colors;
-    } catch (e) {
-      // If encountering an error, return 0
-      print(e.toString());
-      await file.delete();
-      return [Colors.red, Colors.green, Colors.blue];
-    }
   }
 
   Future<void> writeConfig(int id, Color color1, Color color2, Color color3) async {
@@ -162,13 +128,18 @@ class _BlockColorPickerFlutterState extends State<BlockColorPickerFlutter> {
 
   void initConfigColors(int id) {
     print('Init Config $id');
-    isConfigFileExist(id).then((res) {
+    isConfigFileExist(id).then((res) async {
       if (!res) {
-        writeConfig(id, Colors.red, Colors.green, Colors.blue);
+        writeConfig(id, Color.fromRGBO(200, 0, 0, 1), Color.fromRGBO(0, 200, 0, 1), Color.fromRGBO(0, 0, 200, 1));
+        print('!res');
       }
       else {
-        readConfig(id).then((config) {
-          print(config);
+        await readConfig(id).then((colors) {
+          print('else ${colors[1].green}');
+          widget.thisESPColor  = colors[0];
+          widget.otherESPColor = colors[1];
+          widget.appColor      = colors[2];
+          setState(() {});
         });
       }
     });
@@ -357,5 +328,41 @@ class _BlockColorPickerFlutterState extends State<BlockColorPickerFlutter> {
         ),
       ],
     );
+  }
+}
+
+Future<String> get _localPath async {
+  final directory = await getApplicationDocumentsDirectory();
+
+  return directory.path;
+}
+
+Future<File> _localFile(int id) async {
+  final path = await _localPath;
+  return File('$path/config-$id.config');
+}
+
+Future<List<Color>> readConfig(int id) async {
+  print('READ $id');
+  final file = await _localFile(id);
+  try {
+
+    // Read the file
+    final contents = file.readAsStringSync();
+    var colors_values = json.decode(contents);
+    var thisESPColor = Color(colors_values[0]);
+    var otherESPColor = Color(colors_values[1]);
+    var appColor = Color(colors_values[2]);
+    print('try success ${appColor.blue}');
+    return [thisESPColor, otherESPColor, appColor];
+  } catch (e) {
+    // If encountering an error, return 0
+    print('catch');
+    try {
+      await file.delete();
+    } catch (e) {
+      // pss
+    }
+    return [Color.fromRGBO(200, 0, 0, 1), Color.fromRGBO(0, 200, 0, 1), Color.fromRGBO(0, 0, 200, 1)];
   }
 }
